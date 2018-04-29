@@ -111,7 +111,6 @@ func (p *PeerToPeer) FindNetworkAddresses() {
 	reserve := []net.IP{}
 	for _, i := range inf {
 		addresses, err := i.Addrs()
-
 		if err != nil {
 			Log(Error, "Failed to retrieve address for interface. %v", err)
 			continue
@@ -121,7 +120,6 @@ func (p *PeerToPeer) FindNetworkAddresses() {
 			if err != nil {
 				Log(Error, "Failed to parse CIDR notation: %v", err)
 			}
-
 			if ip.IsGlobalUnicast() && p.IsIPv4(ip.String()) {
 				if !FilterInterface(i.Name, ip.String()) {
 					ips = append(ips, ip)

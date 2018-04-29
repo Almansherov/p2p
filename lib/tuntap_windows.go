@@ -13,6 +13,7 @@ import (
 	"unicode/utf16"
 
 	"golang.org/x/sys/windows"
+	"time"
 )
 
 // Windows platform specific constants
@@ -79,7 +80,7 @@ func newTAP(tool, ip, mac, mask string, mtu int) (*TAPWindows, error) {
 	}, nil
 }
 
-// TAPLinux is an interface for TAP device on Linux platform
+// TAPWindows is an interface for TAP device on Windows platform
 type TAPWindows struct {
 	IP         net.IP           // IP
 	Mask       net.IPMask       // Mask
@@ -138,7 +139,7 @@ func (t *TAPWindows) GetHardwareAddress() net.HardwareAddr {
 	return t.Mac
 }
 
-// GetIP returns IP addres of the interface
+// GetIP returns IP address of the interface
 func (t *TAPWindows) GetIP() net.IP {
 	return t.IP
 }
@@ -226,7 +227,6 @@ func (t *TAPWindows) Configure() error {
 	if err != nil {
 		return fmt.Errorf("Failed to properly configure TAP device with netsh: %v", err)
 	}
-
 	in := []byte("\x01\x00\x00\x00")
 	var length uint32
 	err = syscall.DeviceIoControl(t.file, setMediaStatusIOCTL,
@@ -255,6 +255,63 @@ func (t *TAPWindows) Run() {
 	go func() {
 		if err := t.write(t.Tx); err != nil {
 			Log(Error, "Failed ro write packet: %v", err)
+		}
+	}()
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+			Log(Debug, "Checking if TAP interface got deconfigured")
+			inf, err := net.Interfaces()
+			if err != nil {
+				Log(Error, "Failed to retrieve list of network interfaces")
+			}
+			found := false
+			for _, i := range inf {
+				addresses, err := i.Addrs()
+				if err != nil {
+					Log(Error, "Failed to retrieve address for interface. %v", err)
+					continue
+				}
+				for _, address := range addresses {
+					if len(address.String()) < len(t.IP.String()) {
+						continue
+					}
+					if t.IP.String() == address.String()[:len(t.IP.String())] {
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if !found {
+				Log(Debug, "TAP interface got deconfigured. Reconfiguring it")
+				t.Configured = false
+				key, err := t.queryNetworkKey()
+				if err != nil {
+					Log(Error, "Couldn't open Registry Key %s: %s", NetworkKey, err)
+				}
+				err = t.queryAdapters(key)
+				if err != nil {
+					Log(Error, "Failed to query adapters: %s", err)
+					syscall.CloseHandle(t.file)
+				}
+				setip := exec.Command("netsh")
+				setip.SysProcAttr = &syscall.SysProcAttr{}
+				cmd := fmt.Sprintf(`netsh interface ip set address "%s" static %s %s`, t.Interface, t.IP, "255.255.255.0")
+				Log(Debug, "Executing: %s", cmd)
+				setip.SysProcAttr.CmdLine = cmd
+				err = setip.Run()
+				if err != nil {
+					Log(Error, "Could not reconfigure TAP interface: %v", err)
+				} else {
+					Log(Debug, "Interface has been reconfigured")
+					t.MarkConfigured()
+				}
+			} else {
+				Log(Debug, "TAP interface is configured correctly")
+			}
 		}
 	}()
 }

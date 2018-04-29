@@ -56,7 +56,6 @@ func (p *PeerToPeer) AssignInterface(interfaceName string) error {
 	if err != nil {
 		return fmt.Errorf("Failed to initialize TAP: %s", err)
 	}
-
 	if p.Interface.GetIP() == nil {
 		return fmt.Errorf("No IP provided")
 	}
@@ -66,7 +65,6 @@ func (p *PeerToPeer) AssignInterface(interfaceName string) error {
 	if p.Interface.GetName() == "" {
 		return fmt.Errorf("Wrong interface name provided: %s", p.Interface.GetName())
 	}
-
 	// Extract necessary information from config file
 	err = p.Config.Read()
 	if err != nil {
