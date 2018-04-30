@@ -41,6 +41,8 @@ var bootstrap DHTConnection
 
 // ExecDaemon starts P2P daemon
 func ExecDaemon(port int, dht, sFile, profiling, syslog string) {
+	ptp.SetMinLogLevel(ptp.Trace)
+	ptp.Log(ptp.Info, "Starting P2P daemon")
 	if validateDHT(dht) != nil {
 		os.Exit(213)
 	}
@@ -48,8 +50,13 @@ func ExecDaemon(port int, dht, sFile, profiling, syslog string) {
 		ptp.SetSyslogSocket(syslog)
 	}
 	StartProfiling(profiling)
-	ptp.InitPlatform()
+	err := ptp.InitPlatform()
+	if err != nil {
+		ptp.Log(ptp.Error, "An error occurred while initializing the platform: %v", err)
+		os.Exit(1717)
+	}
 	ptp.InitErrors()
+	/*
 	if DefaultLog == "TRACE" {
 		ptp.SetMinLogLevel(ptp.Trace)
 	} else if DefaultLog == "DEBUG" {
@@ -61,6 +68,7 @@ func ExecDaemon(port int, dht, sFile, profiling, syslog string) {
 	} else if DefaultLog == "ERROR" {
 		ptp.SetMinLogLevel(ptp.Error)
 	}
+	*/
 
 	if !ptp.CheckPermissions() {
 		os.Exit(1)
@@ -69,7 +77,7 @@ func ExecDaemon(port int, dht, sFile, profiling, syslog string) {
 
 	ReadyToServe = false
 
-	err := bootstrap.init(dht)
+	err = bootstrap.init(dht)
 	if err != nil {
 		ptp.Log(ptp.Error, "Failed to initialize bootstrap node connection")
 		os.Exit(152)

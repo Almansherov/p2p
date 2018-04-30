@@ -216,7 +216,7 @@ func (t *TAPWindows) Close() error {
 // Configure will configure TAP interface and set it's IP, Mask and other
 // parameters
 func (t *TAPWindows) Configure() error {
-	Log(Debug, "Configuring %s. IP: %s Mask: %s", t.Interface, t.IP.String(), t.Mask.String())
+	Log(Debug, `Configuring "%s". IP: %s Mask: %s`, t.Interface, t.IP.String(), t.Mask.String())
 	setip := exec.Command("netsh")
 	setip.SysProcAttr = &syscall.SysProcAttr{}
 	// TODO: Unhardcode mask
@@ -260,16 +260,16 @@ func (t *TAPWindows) Run() {
 	go func() {
 		for {
 			time.Sleep(10 * time.Second)
-			Log(Debug, "Checking if TAP interface got deconfigured")
+			Log(Debug, `Checking the TAP interface: %v -- %v -- %v`, t.Interface, t.IP, t.Mask)
 			inf, err := net.Interfaces()
 			if err != nil {
-				Log(Error, "Failed to retrieve list of network interfaces")
+				Log(Error, `Failed to retrieve list of network interfaces`)
 			}
 			found := false
 			for _, i := range inf {
 				addresses, err := i.Addrs()
 				if err != nil {
-					Log(Error, "Failed to retrieve address for interface. %v", err)
+					Log(Error, `Failed to retrieve address for interface. %v`, err)
 					continue
 				}
 				for _, address := range addresses {
@@ -286,31 +286,31 @@ func (t *TAPWindows) Run() {
 				}
 			}
 			if !found {
-				Log(Debug, "TAP interface got deconfigured. Reconfiguring it")
+				Log(Debug, `TAP interface got deconfigured. Reconfiguring it`)
 				t.Configured = false
 				key, err := t.queryNetworkKey()
 				if err != nil {
-					Log(Error, "Couldn't open Registry Key %s: %s", NetworkKey, err)
+					Log(Error, `Couldn't open Registry Key %s: %s`, NetworkKey, err)
 				}
 				err = t.queryAdapters(key)
 				if err != nil {
-					Log(Error, "Failed to query adapters: %s", err)
+					Log(Error, `Failed to query adapters: %s`, err)
 					syscall.CloseHandle(t.file)
 				}
-				setip := exec.Command("netsh")
+				setip := exec.Command(`netsh`)
 				setip.SysProcAttr = &syscall.SysProcAttr{}
 				cmd := fmt.Sprintf(`netsh interface ip set address "%s" static %s %s`, t.Interface, t.IP, "255.255.255.0")
-				Log(Debug, "Executing: %s", cmd)
+				Log(Debug, `Executing: %s`, cmd)
 				setip.SysProcAttr.CmdLine = cmd
 				err = setip.Run()
 				if err != nil {
-					Log(Error, "Could not reconfigure TAP interface: %v", err)
+					Log(Error, `Could not reconfigure the TAP interface %v: %v`, t.Interface, err)
 				} else {
-					Log(Debug, "Interface has been reconfigured")
+					Log(Debug, `Interface has been reconfigured`)
 					t.MarkConfigured()
 				}
 			} else {
-				Log(Debug, "TAP interface is configured correctly")
+				Log(Debug, `TAP interface is configured correctly`)
 			}
 		}
 	}()
